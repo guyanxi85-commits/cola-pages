@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>GAN YUXIN — AIGC 影像创作</title>
+<style>
+  :root {
+    --bg: #000;
+    --fg: #fff;
+    --fg-dim: #8a8a8a;
+    --fg-faint: #4a4a4a;
+    --line: #1e1e1e;
+    --accent: #e0e0e0;
+    --sans: "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --mono: "SF Mono", "Cascadia Mono", Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  ::selection { background: #fff; color: #000; }
+  a { color: inherit; text-decoration: none; }
+
+  /* ---------- nav ---------- */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 22px 32px;
+    mix-blend-mode: difference;
+  }
+  nav .logo { font-size: 13px; letter-spacing: .22em; font-weight: 600; }
+  nav .links { display: flex; gap: 30px; }
+  nav .links a { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: #fff; opacity: .75; transition: opacity .3s; text-transform: uppercase; }
+  nav .links a:hover { opacity: 1; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; height: 100vh; overflow: hidden; }
+  .hero video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(.82); }
+  .hero .veil { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,.72) 100%); }
+  .hero .caption {
+    position: absolute; left: 32px; bottom: 44px; z-index: 2;
+  }
+  .hero h1 {
+    font-size: clamp(44px, 8.5vw, 130px); font-weight: 500; letter-spacing: .02em;
+    line-height: .98;
+  }
+  .hero h1 .cn { display: block; font-size: clamp(16px, 2vw, 26px); font-weight: 300; letter-spacing: .55em; margin-top: 18px; color: var(--accent); }
+  .hero .tagline { margin-top: 26px; font-family: var(--mono); font-size: 11px; letter-spacing: .22em; color: var(--fg-dim); text-transform: uppercase; }
+  .hero .scroll-hint {
+    position: absolute; right: 32px; bottom: 44px; z-index: 2;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .3em; color: var(--fg-dim);
+    writing-mode: vertical-rl;
+  }
+  .hero .scroll-hint::after { content: ""; display: block; width: 1px; height: 48px; background: var(--fg-faint); margin: 14px auto 0; animation: drop 2.2s infinite ease-in-out; }
+  @keyframes drop { 0% { transform: scaleY(0); transform-origin: top; } 55% { transform: scaleY(1); transform-origin: top; } 100% { transform: scaleY(1); opacity: 0; } }
+
+  /* ---------- sections ---------- */
+  section { padding: 130px 32px; border-top: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: baseline; gap: 22px; margin-bottom: 70px; }
+  .sec-head .num { font-family: var(--mono); font-size: 11px; color: var(--fg-faint); letter-spacing: .2em; }
+  .sec-head h2 { font-size: clamp(26px, 3.6vw, 44px); font-weight: 400; letter-spacing: .06em; }
+  .sec-head .sub { font-family: var(--mono); font-size: 11px; color: var(--fg-dim); letter-spacing: .18em; margin-left: auto; text-transform: uppercase; }
+
+  /* ---------- works ---------- */
+  .work-list { border-top: 1px solid var(--line); }
+  .work-row {
+    display: grid; grid-template-columns: 90px 1fr auto; gap: 24px; align-items: center;
+    padding: 30px 8px; border-bottom: 1px solid var(--line); cursor: pointer;
+    transition: background .35s, padding-left .35s;
+  }
+  .work-row:hover { background: #0a0a0a; padding-left: 22px; }
+  .work-row .idx { font-family: var(--mono); font-size: 12px; color: var(--fg-faint); letter-spacing: .15em; }
+  .work-row .title { font-size: clamp(20px, 2.6vw, 32px); font-weight: 300; letter-spacing: .04em; }
+  .work-row .meta { font-family: var(--mono); font-size: 10px; color: var(--fg-dim); letter-spacing: .16em; text-align: right; line-height: 1.9; text-transform: uppercase; }
+  .works-foot { margin-top: 46px; font-family: var(--mono); font-size: 11px; color: var(--fg-faint); letter-spacing: .16em; }
+
+  /* ---------- work overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.97);
+    display: none; flex-direction: column;
+  }
+  .overlay.open { display: flex; animation: fadeIn .45s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .overlay .obar { display: flex; justify-content: space-between; align-items: center; padding: 20px 32px; }
+  .overlay .obar .otitle { font-family: var(--mono); font-size: 11px; letter-spacing: .2em; color: var(--fg-dim); text-transform: uppercase; }
+  .overlay .obar .close { cursor: pointer; background: none; border: 1px solid var(--line); color: var(--fg-dim); font-family: var(--mono); font-size: 11px; letter-spacing: .2em; padding: 9px 20px; transition: color .3s, border-color .3s; }
+  .overlay .obar .close:hover { color: #fff; border-color: #555; }
+  .overlay .stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 32px; min-height: 0; }
+  .overlay video { max-width: 100%; max-height: 100%; }
+  .overlay .concepts { padding: 26px 32px 40px; display: flex; justify-content: space-between; gap: 40px; align-items: flex-end; }
+  .overlay .concepts .desc { max-width: 620px; font-size: 14px; font-weight: 300; line-height: 2; color: var(--accent); }
+  .overlay .concepts .tags { font-family: var(--mono); font-size: 10px; color: #9a9a9a; letter-spacing: .16em; text-align: right; line-height: 2.1; text-transform: uppercase; white-space: nowrap; }
+
+  /* ---------- data ---------- */
+  .data-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .data-cell { background: var(--bg); padding: 44px 30px; }
+  .data-cell .big { font-size: clamp(34px, 4.6vw, 60px); font-weight: 200; letter-spacing: .02em; }
+  .data-cell .big em { font-style: normal; font-size: .45em; color: var(--fg-dim); margin-left: 6px; }
+  .data-cell .lbl { margin-top: 14px; font-family: var(--mono); font-size: 10px; letter-spacing: .2em; color: var(--fg-dim); text-transform: uppercase; }
+  .data-note { margin-top: 26px; font-size: 13px; font-weight: 300; color: var(--fg-dim); line-height: 2; max-width: 720px; }
+  .watch-link {
+    display: inline-block; margin-top: 34px; padding: 16px 30px;
+    border: 1px solid #3a3a3a; color: #fff;
+    font-size: 13px; letter-spacing: .12em; font-weight: 300;
+    transition: background .35s, color .35s, border-color .35s;
+  }
+  .watch-link:hover { background: #fff; color: #000; border-color: #fff; }
+  .press-strip { margin-top: 60px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .press-strip figure { border: 1px solid var(--line); overflow: hidden; }
+  .press-strip img { width: 100%; display: block; filter: grayscale(.15); transition: transform .6s ease, filter .6s; }
+  .press-strip figure:hover img { transform: scale(1.02); filter: grayscale(0); }
+  .press-strip figcaption { padding: 12px 14px; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--fg-faint); text-transform: uppercase; border-top: 1px solid var(--line); }
+
+  /* ---------- process ---------- */
+  .process-lede { max-width: 760px; font-size: 15px; font-weight: 300; line-height: 2.2; color: var(--accent); margin-bottom: 70px; }
+  .flow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .flow-grid figure { border: 1px solid var(--line); overflow: hidden; background: #050505; }
+  .flow-grid img { width: 100%; display: block; filter: grayscale(.25) brightness(.9); transition: filter .5s, transform .6s; }
+  .flow-grid figure:hover img { filter: grayscale(0) brightness(1); transform: scale(1.015); }
+  .flow-grid figcaption { padding: 12px 14px; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--fg-faint); line-height: 1.9; text-transform: uppercase; border-top: 1px solid var(--line); }
+  .sop { margin-top: 70px; border-top: 1px solid var(--line); }
+  .sop-item { display: grid; grid-template-columns: 80px 260px 1fr; gap: 28px; padding: 26px 8px; border-bottom: 1px solid var(--line); }
+  .sop-item .no { font-family: var(--mono); font-size: 11px; color: var(--fg-faint); letter-spacing: .15em; }
+  .sop-item .name { font-size: 16px; font-weight: 300; letter-spacing: .05em; }
+  .sop-item .detail { font-size: 13px; font-weight: 300; color: var(--fg-dim); line-height: 1.95; }
+
+  /* ---------- about ---------- */
+  .about-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 80px; }
+  .about-bio { font-size: 16px; font-weight: 300; line-height: 2.3; color: var(--accent); }
+  .about-bio .statement { font-size: clamp(22px, 2.6vw, 32px); font-weight: 300; line-height: 1.7; color: #fff; margin-bottom: 40px; }
+  .about-bio p { margin-bottom: 22px; color: var(--fg-dim); }
+  .about-bio p b { color: var(--accent); font-weight: 400; }
+  .fact-block { border-top: 1px solid var(--line); padding: 24px 0; }
+  .fact-block .k { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; color: var(--fg-faint); text-transform: uppercase; margin-bottom: 14px; }
+  .fact-block .v { font-size: 14px; font-weight: 300; color: var(--accent); line-height: 2.1; }
+  .fact-block .v span { color: var(--fg-dim); }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { border: 1px solid var(--line); padding: 8px 16px; font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--fg-dim); }
+
+  /* ---------- footer ---------- */
+  footer { border-top: 1px solid var(--line); padding: 34px 32px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--fg-faint); text-transform: uppercase; }
+  footer .local-time { color: var(--fg-dim); }
+  .copyright-line {
+    border-top: 1px solid var(--line); padding: 26px 32px 40px; text-align: center;
+    font-size: 11px; letter-spacing: .14em; color: var(--fg-dim); line-height: 2.2;
+  }
+  .copyright-line span { font-size: 10px; color: var(--fg-faint); }
+  body { user-select: none; -webkit-user-select: none; }
+
+  /* ---------- reveal ---------- */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity .9s ease, transform .9s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 900px) {
+    section { padding: 90px 20px; }
+    nav { padding: 18px 20px; }
+    nav .links { gap: 16px; }
+    .data-grid { grid-template-columns: repeat(2, 1fr); }
+    .press-strip, .flow-grid { grid-template-columns: 1fr; }
+    .about-grid { grid-template-columns: 1fr; gap: 40px; }
+    .work-row { grid-template-columns: 50px 1fr; }
+    .work-row .meta { display: none; }
+    .sop-item { grid-template-columns: 50px 1fr; }
+    .sop-item .detail { grid-column: 2; }
+    .overlay .concepts { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">GAN YUXIN</div>
+  <div class="links">
+    <a href="#works">Works</a>
+    <a href="#data">Data</a>
+    <a href="#process">Process</a>
+    <a href="#about">About</a>
+  </div>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero" id="top">
+  <video src="assets/videos/2035-V1.0.mp4" autoplay muted loop playsinline preload="auto"></video>
+  <div class="veil"></div>
+  <div class="caption">
+    <h1>GAN YUXIN<span class="cn">甘雨欣 · AIGC 影像创作</span></h1>
+    <div class="tagline">AI LIVE-ACTION &amp; ANIME FILMMAKER — CHONGQING, CN</div>
+  </div>
+  <div class="scroll-hint">SCROLL</div>
+</header>
+
+<!-- ================= WORKS ================= -->
+<section id="works">
+  <div class="sec-head reveal">
+    <span class="num">01</span>
+    <h2>作品</h2>
+    <span class="sub">Selected Works 2025–2026</span>
+  </div>
+  <div class="work-list reveal" id="workList"></div>
+  <div class="works-foot reveal">点击任意条目放映 — CLICK A ROW TO SCREEN — 影像自己说话，文案退后</div>
+</section>
+
+<!-- ================= DATA ================= -->
+<section id="data">
+  <div class="sec-head reveal">
+    <span class="num">02</span>
+    <h2>数据</h2>
+    <span class="sub">《你好 2035》 · 中国妇女报</span>
+  </div>
+  <div class="data-grid reveal">
+    <div class="data-cell"><div class="big" data-count="3168">0</div><div class="lbl">视频号点赞 / Likes</div></div>
+    <div class="data-cell"><div class="big" data-count="3119">0</div><div class="lbl">视频号收藏 / Saves</div></div>
+    <div class="data-cell"><div class="big" data-count="1161">0</div><div class="lbl">视频号转发 / Shares</div></div>
+    <div class="data-cell"><div class="big" data-count="11000">0</div><div class="lbl">公众号阅读 · 第 1 集 / Reads</div></div>
+  </div>
+  <p class="data-note reveal">
+    《你好 2035》——中国妇女报国庆献礼 AI 创意短剧。作为 AI 视觉核心成员参与制作，项目对中国式写实质感与重工业场景严谨度要求极高，经多轮官方审核后按时上线。以下为各平台收录数据：<b>微信公众号</b>（第 1 集《黑灯工厂》阅读 1.1 万、赞 74）、<b>微信视频号</b>（赞 3168 · 收藏 3119 · 转发 1161 · 留言 23）。
+  </p>
+  <a class="watch-link reveal" href="https://weixin.qq.com/sph/ASG5MepqMl" target="_blank" rel="noopener nofollow">▶ 观看正片《你好 2035》第 1 集 — WATCH FULL EPISODE ↗</a>
+  <div class="press-strip reveal">
+    <figure><img src="assets/images/data-gzh-engagement.jpg" alt="微信公众号互动数据"><figcaption>WECHAT 公众号 — 赞 74 · 转发 117 · 收藏 51 · 留言 9</figcaption></figure>
+    <figure><img src="assets/images/data-sph.jpg" alt="微信视频号数据"><figcaption>微信视频号 — 赞 3168 · 收藏 3119 · 转发 1161 · 留言 23</figcaption></figure>
+    <figure><img src="assets/images/data-gzh-reads.jpg" alt="公众号阅读量数据"><figcaption>WECHAT — 第 1 集《黑灯工厂》阅读 1.1W</figcaption></figure>
+  </div>
+</section>
+
+<!-- ================= PROCESS ================= -->
+<section id="process">
+  <div class="sec-head reveal">
+    <span class="num">03</span>
+    <h2>工作流</h2>
+    <span class="sub">Process Archive</span>
+  </div>
+  <p class="process-lede reveal">
+    从分镜脚本到成片的完整 AI 影像生产链路：拆解分镜、搭建高阶 Prompt 库锁定人物五官与画风、参考图控制角色一致性、运镜与光影逐句编写，再经局部重绘与逐帧精修解决畸变与角色漂移——沉淀出政务级写实 AI 短剧的标准化 SOP。
+  </p>
+  <div class="flow-grid reveal">
+    <figure><img src="assets/images/V1.0工作流.jpg" alt="Seedance 分镜工作流"><figcaption>SEEDANCE 2.0 — 参考图角色锁定 · 正反打分镜</figcaption></figure>
+    <figure><img src="assets/images/V1.0工作流2.jpg" alt="Seedance 光影运镜提示词"><figcaption>SEEDANCE 2.0 — IMAX 胶片质感 · 低饱和灰蓝影调</figcaption></figure>
+    <figure><img src="assets/images/V1.0工作流3.jpg" alt="Seedance 台词分镜"><figcaption>SEEDANCE 2.0 — 台词节拍 · 运镜指令化</figcaption></figure>
+    <figure><img src="assets/images/工作流.png" alt="全能参考工作流"><figcaption>SEEDANCE 2.0 PRO — 全能参考 · 七图视觉锚点</figcaption></figure>
+    <figure><img src="assets/images/工作流2.png" alt="AI 视频编辑工作台"><figcaption>AI EDITING — 深度提取 · 智能续写 · 片段重拍</figcaption></figure>
+    <figure><img src="assets/images/工作流3.png" alt="剪映成片工程"><figcaption>剪映 PRO — 多时间线精修 · 30FPS REC.709 成片</figcaption></figure>
+  </div>
+  <div class="sop reveal">
+    <div class="sop-item"><span class="no">SOP/01</span><span class="name">分镜拆解与脚本工程</span><span class="detail">将剧本拆解为镜头级 Prompt：景别、运镜、正反打、光影主次、台词节拍逐句编写，形成可复用的分镜指令结构。</span></div>
+    <div class="sop-item"><span class="no">SOP/02</span><span class="name">角色一致性与画风锁定</span><span class="detail">搭建高阶 Prompt 库 + 多参考图锚点，锁定人物五官、服装与场景时间，攻克长叙事 AI 视频角色跳变问题。</span></div>
+    <div class="sop-item"><span class="no">SOP/03</span><span class="name">场景生成与质感控制</span><span class="detail">动态笔刷与局部重绘生成黑灯工厂等高保真工业场景，低饱和灰蓝影调、胶片颗粒统一全片视觉基调。</span></div>
+    <div class="sop-item"><span class="no">SOP/04</span><span class="name">精修与量产交付</span><span class="detail">针对五官畸变、画面失真做逐帧精修迭代；双线适配政务项目多轮审核与商业短视频矩阵批量交付。</span></div>
+  </div>
+</section>
+
+<!-- ================= ABOUT ================= -->
+<section id="about">
+  <div class="sec-head reveal">
+    <span class="num">04</span>
+    <h2>关于</h2>
+    <span class="sub">About</span>
+  </div>
+  <div class="about-grid">
+    <div class="about-bio reveal">
+      <div class="statement">用 AI 拍摄真人质感的影像——<br>让机器学会电影的语言。</div>
+      <p>甘雨欣，21 岁，重庆。AIGC 真人 / 动漫制作方向。先后在<b>北京兴艺凯晨（泛亚红雪）</b>与<b>重庆蓝狮子文化传播</b>从事 AIGC 真人短剧制作，实习期间高质量交付商业成片 <b>18 集</b>（AI 真人短剧、AI 漫剧），全部通过平台审核。</p>
+      <p>作为中国妇女报国庆献礼 AI 创意短剧<b>《你好 2035》</b>的 AI 视觉核心成员，在政务级标准下攻坚长叙事角色跳变与工业场景失真，沉淀出可复用的写实 AI 短剧制作 SOP。</p>
+      <p>重庆城市管理职业学院 · 数字媒体技术专业（GPA 3.3/4.0，专业排名前 15%）。2024 全国《奋进青年》奖（Top 5%）、全国《一带一路讲解员》称号。</p>
+    </div>
+    <div>
+      <div class="fact-block reveal">
+        <div class="k">AI Tools</div>
+        <div class="chips"><span class="chip">Stable Diffusion</span><span class="chip">ControlNet</span><span class="chip">可灵 AI</span><span class="chip">即梦 AI</span><span class="chip">Seedance 2.0</span></div>
+      </div>
+      <div class="fact-block reveal">
+        <div class="k">Post Production</div>
+        <div class="chips"><span class="chip">Premiere Pro</span><span class="chip">剪映专业版</span><span class="chip">Photoshop</span><span class="chip">After Effects</span><span class="chip">C4D</span></div>
+      </div>
+      <div class="fact-block reveal">
+        <div class="k">Capabilities</div>
+        <div class="v">分层 Prompt 工程 · 角色画风锁定 · 局部重绘与瑕疵修复 · 分镜脚本 · 运镜控制 · 短视频平台审核规范适配 · 全流程独立成片</div>
+      </div>
+      <div class="fact-block reveal">
+        <div class="k">Contact</div>
+        <div class="v">ganyuxin@163.com<br><span>重庆 · 可远程</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>© 2026 GAN YUXIN — EDITION 1.0</div>
+  <div class="local-time" id="localTime">CHONGQING —:—</div>
+  <div>MADE WITH AI &amp; CINEMA</div>
+</footer>
+<div class="copyright-line">所有素材仅求职展示，禁止下载、录屏、截图及二次商用，版权归原项目方所有<br><span>网页技术无法完全杜绝手机翻拍录屏，本页仅做警示与基础防护</span></div>
+
+<!-- ================= WORK OVERLAY ================= -->
+<div class="overlay" id="overlay">
+  <div class="obar">
+    <div class="otitle" id="ovTitle"></div>
+    <button class="close" id="ovClose">CLOSE ✕</button>
+  </div>
+  <div class="stage"><video id="ovVideo" controls controlslist="nodownload noplaybackrate" disablepictureinpicture playsinline preload="metadata"></video></div>
+  <div class="concepts">
+    <div class="desc" id="ovDesc"></div>
+    <div class="tags" id="ovTags"></div>
+  </div>
+</div>
+
+<script>
+  // ---------- works data ----------
+  const WORKS = [
+    { file: "assets/videos/2035-V1.0.mp4", title: "《你好 2035》V1.0", dur: "01:36",
+      desc: "写给 2035 年的时光来信。中国妇女报首位数智记者晓夏走进“黑灯工厂”，在冷光大屏与机械臂之间，见证中国制造的产业转身——不是 AI 取代人类，而是产业转型升级。",
+      tags: "AI 真人短剧 / 政务级 / 中国妇女报" },
+    { file: "assets/videos/2035V2.0.mp4", title: "《你好 2035》V2.0", dur: "01:19",
+      desc: "系列精修版。低饱和灰蓝影调、IMAX 胶片颗粒、浅景深——用写实质感回应“AI 视频是塑料感”的偏见。经多轮官方审核后于国庆档上线。",
+      tags: "AI 真人短剧 / HERO CUT / 国庆献礼" },
+    { file: "assets/videos/AIh海外真人混剪.mp4", title: "海外真人混剪", dur: "00:25",
+      desc: "海外真人素材 AI 混剪。快节奏卡点与跨素材人物一致性处理。",
+      tags: "混剪 / 海外真人" },
+    { file: "assets/videos/《卖火柴的小女孩》.mp4", title: "《卖火柴的小女孩》", dur: "01:34",
+      desc: "经典文学的 AI 影像改编。用生成式影像重述安徒生，光影与颗粒感承担全部情绪。",
+      tags: "AI 改编 / 文学重述" },
+    { file: "assets/videos/《天地钱庄》..mp4", title: "《天地钱庄》", dur: "03:27",
+      desc: "AI 真人短剧。从选题策划到后期剪辑的全链路独立制作，长叙事下保持角色与画风的高度统一。",
+      tags: "AI 真人短剧 / 全流程 / 长叙事" },
+    { file: "assets/videos/《所有人都在骗我》 .mp4", title: "《所有人都在骗我》", dur: "00:44",
+      desc: "AI 真人短剧片段。人物情绪表演与镜头语言优先，验证人机协作叙事的节奏控制。",
+      tags: "AI 真人短剧 / 叙事实验" },
+    { file: "assets/videos/35.成片.mp4", title: "《黑道求情》", dur: "01:16",
+      desc: "商业交付成片，实习期间流水线量产作品之一——统一视觉、按期过审。",
+      tags: "商业交付 / 量产" },
+    { file: "assets/videos/51.mp4", title: "《她的致命伪装》", dur: "01:34",
+      desc: "商业交付成片，实习期间流水线量产作品之一。",
+      tags: "商业交付 / 量产" },
+  ];
+
+  const list = document.getElementById('workList');
+  WORKS.forEach((w, i) => {
+    const row = document.createElement('div');
+    row.className = 'work-row';
+    row.innerHTML = `<span class="idx">${String(i+1).padStart(2,'0')} / ${String(WORKS.length).padStart(2,'0')}</span>
+      <span class="title">${w.title}</span>
+      <span class="meta">DUR ${w.dur}<br>AI LIVE-ACTION</span>`;
+    row.addEventListener('click', () => openWork(i));
+    list.appendChild(row);
+  });
+
+  // ---------- overlay ----------
+  const overlay = document.getElementById('overlay');
+  const ovVideo = document.getElementById('ovVideo');
+  function openWork(i) {
+    const w = WORKS[i];
+    document.getElementById('ovTitle').textContent = `${String(i+1).padStart(2,'0')} — ${w.title}`;
+    document.getElementById('ovDesc').textContent = w.desc;
+    document.getElementById('ovTags').innerHTML = w.tags.replaceAll(' / ', '<br>');
+    ovVideo.src = w.file;
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    ovVideo.play().catch(()=>{});
+  }
+  function closeWork() {
+    overlay.classList.remove('open');
+    ovVideo.pause(); ovVideo.src = '';
+    document.body.style.overflow = '';
+  }
+  document.getElementById('ovClose').addEventListener('click', closeWork);
+  overlay.addEventListener('click', e => { if (e.target === overlay || e.target.classList.contains('stage')) closeWork(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWork(); });
+
+  // ---------- basic anti-download protection ----------
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('dragstart', e => { if (e.target.tagName === 'VIDEO' || e.target.tagName === 'IMG') e.preventDefault(); });
+  document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && ['s', 'S', 'p', 'P'].includes(e.key)) e.preventDefault(); });
+
+  // ---------- reveal on scroll ----------
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+  }, { threshold: .12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ---------- count-up ----------
+  const cio = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if (!en.isIntersecting) return;
+      const el = en.target, target = +el.dataset.count, dur = 1600, t0 = performance.now();
+      const fmt = n => n >= 10000 ? (n/10000).toFixed(1).replace(/\.0$/,'') + 'w' : n.toLocaleString();
+      const step = now => {
+        const p = Math.min((now - t0) / dur, 1), eased = 1 - Math.pow(1 - p, 3);
+        el.innerHTML = fmt(Math.round(target * eased)) + (target >= 10000 ? '<em> 阅读 · EP.1</em>' : '');
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+      cio.unobserve(el);
+    });
+  }, { threshold: .5 });
+  document.querySelectorAll('[data-count]').forEach(el => cio.observe(el));
+
+  // ---------- footer local time ----------
+  function tick() {
+    const t = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    document.getElementById('localTime').textContent = 'CHONGQING ' + t;
+  }
+  tick(); setInterval(tick, 30000);
+</script>
+</body>
+</html>
